@@ -1,0 +1,9 @@
+.env
+.env.railway
+bin/
+data/
+tmp/
+*.exe
+*.test
+*.out
+.DS_Store
