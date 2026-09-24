@@ -227,6 +227,8 @@ func (r *Repo) FinalizeFingerprint(ctx context.Context, src Source, fp fingerpri
 		if _, err := tx.Exec(ctx, `
 			UPDATE documents d SET
 				status = CASE
+					WHEN d.status = 'rejected'
+						THEN 'rejected'
 					WHEN EXISTS (SELECT 1 FROM sources s WHERE s.document_id = d.id AND s.content_sha256 IS NULL)
 						THEN 'processing'
 					WHEN EXISTS (
@@ -236,6 +238,12 @@ func (r *Repo) FinalizeFingerprint(ctx context.Context, src Source, fp fingerpri
 						  AND s.released = FALSE
 					)
 						THEN 'pending_review'
+					WHEN EXISTS (
+						SELECT 1 FROM sources s
+						WHERE s.document_id = d.id
+						  AND s.uniqueness IN ('duplicate', 'original')
+					) AND d.review_requested_at IS NOT NULL
+						THEN 'approved'
 					WHEN EXISTS (
 						SELECT 1 FROM sources s
 						WHERE s.document_id = d.id

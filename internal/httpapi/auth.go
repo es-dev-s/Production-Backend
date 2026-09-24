@@ -193,11 +193,12 @@ func (s *Server) rejectReview(w http.ResponseWriter, r *http.Request) {
 		writeErrCode(w, http.StatusBadRequest, "invalid", "invalid id")
 		return
 	}
-	if err := s.docs.Reject(r.Context(), id); err != nil {
+	doc, err := s.docs.Reject(r.Context(), id)
+	if err != nil {
 		s.writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	writeJSON(w, http.StatusOK, doc)
 }
 
 func (s *Server) uploadStats(w http.ResponseWriter, r *http.Request) {

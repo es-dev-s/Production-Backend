@@ -15,6 +15,21 @@ func TestPublicViewHidesPendingReview(t *testing.T) {
 	}
 }
 
+func TestPublicViewHidesRejected(t *testing.T) {
+	doc := Document{ID: uuid.New(), Status: StatusRejected}
+	if err := PublicView(&doc); err != ErrNotFound {
+		t.Fatalf("rejected must be hidden, got %v", err)
+	}
+}
+
+func TestPublicViewAllowsApproved(t *testing.T) {
+	id := uuid.New()
+	doc := Document{ID: id, Status: StatusApproved, Sources: []Source{{ID: uuid.New()}}}
+	if err := PublicView(&doc); err != nil {
+		t.Fatalf("approved must be shareable, got %v", err)
+	}
+}
+
 func TestPublicViewHidesProcessing(t *testing.T) {
 	doc := Document{ID: uuid.New(), Status: StatusProcessing}
 	if err := PublicView(&doc); err != ErrNotFound {

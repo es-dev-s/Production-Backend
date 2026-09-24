@@ -565,13 +565,7 @@ func (r *Repo) Approve(ctx context.Context, id uuid.UUID) error {
 				status = CASE
 					WHEN EXISTS (SELECT 1 FROM sources s WHERE s.document_id = d.id AND s.content_sha256 IS NULL)
 						THEN 'processing'
-					WHEN EXISTS (
-						SELECT 1 FROM sources s
-						WHERE s.document_id = d.id
-						  AND s.uniqueness IN ('duplicate', 'original')
-					)
-						THEN 'duplicate'
-					ELSE 'completed'
+					ELSE 'approved'
 				END,
 				notified_at = NULL,
 				updated_at = now()
@@ -580,7 +574,10 @@ func (r *Repo) Approve(ctx context.Context, id uuid.UUID) error {
 	})
 }
 
-func (r *Repo) RejectPending(ctx context.Context, id uuid.UUID) (keys []string, deleted bool, err error) {
+// RejectPending removes every pending file from storage and the sources table so
+// the upload never enters the document corpus. The document row stays with
+// status=rejected so the uploading member can see the admin decision.
+func (r *Repo) RejectPending(ctx context.Context, id uuid.UUID) (keys []string, err error) {
 	err = r.withTx(ctx, func(tx pgx.Tx) error {
 		var exists uuid.UUID
 		var status string
@@ -594,7 +591,7 @@ func (r *Repo) RejectPending(ctx context.Context, id uuid.UUID) (keys []string, 
 		if status != string(StatusPendingReview) {
 			return ErrInvalid
 		}
-		rows, qerr := tx.Query(ctx, `SELECT storage_key FROM sources WHERE document_id=$1 AND released=FALSE`, id)
+		rows, qerr := tx.Query(ctx, `SELECT storage_key FROM sources WHERE document_id=$1`, id)
 		if qerr != nil {
 			return qerr
 		}
@@ -610,38 +607,17 @@ func (r *Repo) RejectPending(ctx context.Context, id uuid.UUID) (keys []string, 
 		if err := rows.Err(); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM sources WHERE document_id=$1 AND released=FALSE`, id); err != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM sources WHERE document_id=$1`, id); err != nil {
 			return err
-		}
-		var n int
-		if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM sources WHERE document_id=$1`, id).Scan(&n); err != nil {
-			return err
-		}
-		if n == 0 {
-			if _, err := tx.Exec(ctx, `DELETE FROM documents WHERE id=$1`, id); err != nil {
-				return err
-			}
-			deleted = true
-			return nil
 		}
 		_, err := tx.Exec(ctx, `
-			UPDATE documents d SET
-				status = CASE
-					WHEN EXISTS (SELECT 1 FROM sources s WHERE s.document_id = d.id AND s.content_sha256 IS NULL)
-						THEN 'processing'
-					WHEN EXISTS (
-						SELECT 1 FROM sources s
-						WHERE s.document_id = d.id
-						  AND s.uniqueness IN ('duplicate', 'original')
-					)
-						THEN 'duplicate'
-					ELSE 'completed'
-				END,
+			UPDATE documents SET
+				status = 'rejected',
 				updated_at = now()
-			WHERE d.id = $1`, id)
+			WHERE id = $1`, id)
 		return err
 	})
-	return keys, deleted, err
+	return keys, err
 }
 
 func (r *Repo) ListUnhashed(ctx context.Context, limit int) ([]Source, error) {
@@ -770,6 +746,12 @@ func decorate(d *Document) {
 		d.Title = d.Sources[0].Title
 		d.FileURL = fileURL(d.ID, d.Sources[0].ID)
 		d.TitlePending = open || !engine.TitleSettled(d.Title)
+		return
+	}
+	if d.Status == StatusRejected {
+		d.Title = d.ERP
+		d.FileURL = ""
+		d.TitlePending = false
 		return
 	}
 	d.Title = d.ERP

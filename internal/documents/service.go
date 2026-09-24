@@ -281,41 +281,35 @@ func (s *Service) Approve(ctx context.Context, id uuid.UUID) (Document, error) {
 	}
 	s.hub.Publish(ctx, "document.updated", out)
 	if s.notes != nil && out.OwnerID != nil {
-		_ = s.notes.NotifyUser(ctx, *out.OwnerID, "Duplicate approved", fmt.Sprintf("%s is now in your documents.", label(out)), "approved", &out.ID)
+		_ = s.notes.NotifyUser(ctx, *out.OwnerID, "Duplicate approved", fmt.Sprintf("%s was approved and is now in your documents.", label(out)), "approved", &out.ID)
 	}
 	return out, nil
 }
 
-func (s *Service) Reject(ctx context.Context, id uuid.UUID) error {
+func (s *Service) Reject(ctx context.Context, id uuid.UUID) (Document, error) {
 	if err := s.requireAdmin(ctx); err != nil {
-		return err
+		return Document{}, err
 	}
 	doc, err := s.repo.Get(ctx, id)
 	if err != nil {
-		return err
+		return Document{}, err
 	}
-	keys, deleted, err := s.repo.RejectPending(ctx, id)
+	keys, err := s.repo.RejectPending(ctx, id)
 	if err != nil {
-		return err
+		return Document{}, err
 	}
 	for _, key := range keys {
 		_ = s.blob.Delete(ctx, key)
 	}
-	if deleted {
-		s.hub.Publish(ctx, "document.deleted", map[string]any{
-			"id":       id.String(),
-			"owner_id": doc.OwnerID,
-		})
-	} else {
-		out, getErr := s.repo.Get(ctx, id)
-		if getErr == nil {
-			s.hub.Publish(ctx, "document.updated", out)
-		}
+	out, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return Document{}, err
 	}
+	s.hub.Publish(ctx, "document.updated", out)
 	if s.notes != nil && doc.OwnerID != nil {
-		_ = s.notes.NotifyUser(ctx, *doc.OwnerID, "Duplicate declined", fmt.Sprintf("%s was not approved and the pending files were removed.", label(doc)), "rejected", &doc.ID)
+		_ = s.notes.NotifyUser(ctx, *doc.OwnerID, "Duplicate declined", fmt.Sprintf("%s was not approved.", label(doc)), "rejected", &out.ID)
 	}
-	return nil
+	return out, nil
 }
 
 func (s *Service) requireAdmin(ctx context.Context) error {

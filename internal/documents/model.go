@@ -14,6 +14,8 @@ const (
 	StatusOriginal      Status = "original"
 	StatusDuplicate     Status = "duplicate"
 	StatusPendingReview Status = "pending_review"
+	StatusApproved      Status = "approved"
+	StatusRejected      Status = "rejected"
 )
 
 type Uniqueness string
