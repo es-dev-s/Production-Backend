@@ -64,7 +64,7 @@ func (r *Repo) List(ctx context.Context, filter ListFilter) ([]Document, error) 
 	}
 	query := `
 		SELECT id, client, erp, anzsco, team, member, status, created_at, owner_id,
-		       review_note, review_requested_at
+		       review_note, review_requested_at, source_count
 		FROM documents`
 	args := []any{}
 	switch {
@@ -120,7 +120,7 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (Document, error) {
 	var d Document
 	err = scanDocument(db.QueryRow(ctx, `
 		SELECT id, client, erp, anzsco, team, member, status, created_at, owner_id,
-		       review_note, review_requested_at
+		       review_note, review_requested_at, source_count
 		FROM documents WHERE id=$1`, id), &d)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Document{}, ErrNotFound
@@ -613,8 +613,9 @@ func (r *Repo) RejectPending(ctx context.Context, id uuid.UUID) (keys []string, 
 		_, err := tx.Exec(ctx, `
 			UPDATE documents SET
 				status = 'rejected',
+				source_count = $2,
 				updated_at = now()
-			WHERE id = $1`, id)
+			WHERE id = $1`, id, len(keys))
 		return err
 	})
 	return keys, err
@@ -735,6 +736,9 @@ func decorate(d *Document) {
 			d.Sources[i].Note = strings.TrimSpace(d.Sources[i].Note)
 		}
 	}
+	if n := len(d.Sources); n > d.SourceCount {
+		d.SourceCount = n
+	}
 	foldTitleSimilar(d)
 	if display != "" {
 		d.Title = display
@@ -767,7 +771,7 @@ func scanDocument(row documentScanner, d *Document) error {
 	var owner uuid.NullUUID
 	if err := row.Scan(
 		&d.ID, &d.Client, &d.ERP, &d.ANZSCO, &d.Team, &d.Member, &d.Status, &d.Uploaded, &owner,
-		&d.ReviewNote, &d.ReviewRequestedAt,
+		&d.ReviewNote, &d.ReviewRequestedAt, &d.SourceCount,
 	); err != nil {
 		return err
 	}

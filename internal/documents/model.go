@@ -136,6 +136,7 @@ type Document struct {
 	URL               string              `json:"url"`
 	FileURL           string              `json:"file_url"`
 	Sources           []Source            `json:"sources"`
+	SourceCount       int                 `json:"source_count"`
 	OwnerID           *uuid.UUID          `json:"owner_id,omitempty"`
 	ReviewNote        string              `json:"review_note,omitempty"`
 	ReviewRequestedAt *time.Time          `json:"review_requested_at,omitempty"`
