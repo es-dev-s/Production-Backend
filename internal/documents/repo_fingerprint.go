@@ -242,12 +242,6 @@ func (r *Repo) FinalizeFingerprint(ctx context.Context, src Source, fp fingerpri
 						SELECT 1 FROM sources s
 						WHERE s.document_id = d.id
 						  AND s.uniqueness IN ('duplicate', 'original')
-					) AND d.review_requested_at IS NOT NULL
-						THEN 'approved'
-					WHEN EXISTS (
-						SELECT 1 FROM sources s
-						WHERE s.document_id = d.id
-						  AND s.uniqueness IN ('duplicate', 'original')
 					)
 						THEN 'duplicate'
 					ELSE 'completed'

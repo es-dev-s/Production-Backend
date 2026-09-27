@@ -281,7 +281,7 @@ func (s *Service) Approve(ctx context.Context, id uuid.UUID) (Document, error) {
 	}
 	s.hub.Publish(ctx, "document.updated", out)
 	if s.notes != nil && out.OwnerID != nil {
-		_ = s.notes.NotifyUser(ctx, *out.OwnerID, "Duplicate approved", fmt.Sprintf("%s was approved and is now in your documents.", label(out)), "approved", &out.ID)
+		_ = s.notes.NotifyUser(ctx, *out.OwnerID, "Duplicate approved", fmt.Sprintf("%s is now in your documents.", label(out)), "approved", &out.ID)
 	}
 	return out, nil
 }

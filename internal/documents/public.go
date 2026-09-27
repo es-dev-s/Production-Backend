@@ -3,7 +3,7 @@ package documents
 import "github.com/google/uuid"
 
 func publiclyShareable(status Status) bool {
-	return status == StatusCompleted || status == StatusDuplicate || status == StatusOriginal || status == StatusApproved
+	return status == StatusCompleted || status == StatusDuplicate || status == StatusOriginal
 }
 
 // PublicView strips private fields and rewrites file links for the unlisted

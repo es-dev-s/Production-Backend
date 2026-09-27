@@ -565,7 +565,13 @@ func (r *Repo) Approve(ctx context.Context, id uuid.UUID) error {
 				status = CASE
 					WHEN EXISTS (SELECT 1 FROM sources s WHERE s.document_id = d.id AND s.content_sha256 IS NULL)
 						THEN 'processing'
-					ELSE 'approved'
+					WHEN EXISTS (
+						SELECT 1 FROM sources s
+						WHERE s.document_id = d.id
+						  AND s.uniqueness IN ('duplicate', 'original')
+					)
+						THEN 'duplicate'
+					ELSE 'completed'
 				END,
 				notified_at = NULL,
 				updated_at = now()
